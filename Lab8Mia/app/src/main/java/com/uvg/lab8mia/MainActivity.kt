@@ -1,15 +1,25 @@
 package com.uvg.lab8mia
 
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.sharp.AccountBox
+import androidx.compose.material.icons.sharp.Person
+import androidx.compose.material.icons.sharp.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -23,8 +33,19 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object LoginDestination
 @Serializable data object MainDestination
+@Serializable data object AltDestination
+@Serializable data object ProfileDestination
 @Serializable data object CharacterScreenDestination
+@Serializable data object LocationScreenDestination
 @Serializable data class CharacterDescriptionDestination(val id: Int)
+@Serializable data class LocationDetailsDestination(val id: Int)
+
+data class NavItem(
+    val title: String,
+    val destination: Any,
+    val Icon: ImageVector
+)
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,13 +61,59 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppContent() {
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        val navController = rememberNavController()
+    val navController = rememberNavController()
+    val items = listOf(
+        NavItem("Characters", CharacterScreenDestination, Icons.Sharp.Person),
+        NavItem("Places", LocationScreenDestination, Icons.Sharp.Place),
+        NavItem("Profile", ProfileDestination, Icons.Sharp.AccountBox)
+
+    )
+
+    var selectedItemIndex by rememberSaveable {
+        mutableStateOf(0)
+    }
+    var logged by rememberSaveable {
+        mutableStateOf(false)
+    }
+    Scaffold(modifier = Modifier.fillMaxSize(), bottomBar = {
+        when (logged){
+            true -> NavigationBar {
+                items.forEachIndexed { index, navItem ->
+                    NavigationBarItem(
+                        selected = selectedItemIndex == index,
+                        label = {Text(text = navItem.title)},
+                        onClick = {
+                            selectedItemIndex = index
+                            navController.navigate(navItem.destination)
+                        },
+                        icon = {
+                            Icon(navItem.Icon, contentDescription = "Icon")
+                        })
+                }
+            }
+            else -> {}
+        }
+    }
+
+        ) { innerPadding ->
         NavHost(navController = navController, startDestination = LoginDestination) {
             composable<LoginDestination> {
                 WelcomeScreen(
                     modifier = Modifier.padding(innerPadding),
-                    onEnterApp = { navController.navigate(route = CharacterScreenDestination) }
+                    onEnterApp = {
+                        navController.navigate(route = CharacterScreenDestination)
+                        logged = true
+                    }
+                )
+            }
+            composable<ProfileDestination> {
+                ProfileScreen(
+                    onSignOut = {
+
+                        navController.navigate(route = LoginDestination)
+                        navController.popBackStack(route = MainDestination, inclusive = false)
+                        logged = false
+                    }
                 )
             }
             navigation<MainDestination>(startDestination = CharacterScreenDestination) {
@@ -62,6 +129,22 @@ fun AppContent() {
                     CharacterDetailsScreen(
                         navigateBack = { navController.navigateUp() },
                         characterId = destination.id
+                    )
+                }
+            }
+            navigation<AltDestination>(startDestination = LocationScreenDestination) {
+                composable<LocationScreenDestination> {
+                    LocationScreen(
+                        onLocationSelected = { id: Int ->
+                            navController.navigate(LocationDetailsDestination(id = id))
+                        }
+                    )
+                }
+                composable<LocationDetailsDestination> {
+                    val destination = it.toRoute<LocationDetailsDestination>()
+                    LocationDetails(
+                        navigateBack = { navController.navigateUp() },
+                        locationId = destination.id
                     )
                 }
             }
